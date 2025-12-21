@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Sight Reading Practice</title>
+    <script src="https://unpkg.com/vextab/releases/div.prod.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <style>
+        /* --- General Layout --- */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #f0f2f5; 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+
+        /* --- Shared Container Styles (Cards) --- */
+        #controls, 
+        #notation-container, 
+        #instruction-box { 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        }
+
+        #controls, #notation-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            display: inline-block; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            
+            /* Added mobile-safety properties */
+            max-width: 100%;      /* Prevents hitting the screen edges */
+            box-sizing: border-box; /* Includes padding in the width calculation */
+        }
+
+        #controls { margin-bottom: 20px; }
+        #notation-container { margin-top: 20px; }
+        
+        .editor {
+            width: 100%;            /* Fill the parent card width */
+            max-width: 100%;        /* Hard limit to prevent overflow */
+            box-sizing: border-box; /* Crucial: includes padding/border in the 100% width */
+            display: block;         /* Ensures it respects the width constraints */
+            margin: 10px auto;      /* Centers it and adds spacing */
+            
+            /* Optional: Improves mobile typing experience */
+            font-size: 16px;        /* Prevents iOS auto-zoom on focus */
+            padding: 12px;
+        }
+        
+        /* Specific Content Scaling */
+        #notation-container svg, 
+        #notation-container img {
+            max-width: 100%;     /* Forces the music notation to shrink to fit the box */
+            height: auto;        /* Maintains the aspect ratio */
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* --- Instruction Box Specifics --- */
+        #instruction-box {
+            border-left: 5px solid #4A90E2;
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+            padding: 15px 25px;
+            text-align: left;
+            border-radius: 4px; /* Keeps the distinct sharper look */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* Lighter shadow per original */
+        }
+
+        #instruction-box h3 { margin-top: 0; color: #333; font-size: 18px; }
+        #instruction-box ul { margin: 0; padding-left: 20px; color: #555; line-height: 1.6; }
+        #instruction-box li { margin-bottom: 8px; }
+
+        /* --- Form Controls --- */
+        .control-group { 
+            margin: 5px; 
+            display: inline-block; 
+            text-align: left; 
+            vertical-align: top; 
+        }
+
+        .checkbox-item {
+            margin: 5px; 
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        input[type="number"] { 
+            width: 50px; 
+            padding: 5px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc; 
+        }
+
+        input[type="checkbox"] {
+            transform: scale(1.2); 
+            margin-right: 5px;
+        }
+
+        /* --- Unified Button Styles --- */
+        button { 
+            padding: 15px 25px; 
+            font-size: 18px; 
+            font-weight: bold;
+            cursor: pointer; 
+            background: #4A90E2; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            margin: 8px; 
+            width: 80%; 
+            max-width: 400px; 
+            transition: background 0.2s ease;
+        }
+
+        button:hover { 
+            background: #357ABD; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Guitar Sight Reading Practice</h1>
+
+    <div id="controls">
+        <div class="control-group">
+            <label><strong>Fret Range:</strong></label><br>
+            Min: <input type="number" id="minFret" value="0">
+            Max: <input type="number" id="maxFret" value="4">
+        </div>
+
+        <div class="control-group">
+            <label><strong>Strings:</strong></label><br>
+            <input type="checkbox" class="string-opt" value="1" > 1
+            <input type="checkbox" class="string-opt" value="2" > 2
+            <input type="checkbox" class="string-opt" value="3" > 3
+            <input type="checkbox" class="string-opt" value="4" checked> 4
+            <input type="checkbox" class="string-opt" value="5" checked> 5
+            <input type="checkbox" class="string-opt" value="6" checked> 6
+        </div>
+        <br>
+        <div id="controls">
+            <strong>Include Patterns:</strong><br><br>
+            <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="quarter" checked> ♩ (Quarter)</label>
+            <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="eighths" checked> ♫ (Eighths)</label>
+            <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="rest_eighth" > 𝄾 ♪ (8th Rest/Note)</label>
+            <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="quarter_rest" checked> 𝄽 (Quarter Rest)</label>
+        </div>
+        <br>
+        <button onclick="generate()">Generate New Test</button>
+        <br>
+        <button onclick="playExercise()">Play Audio</button>
+        <br>
+        <button onclick="toggleTimeSignature()">Show/Hide Time Signature</button>
+        <br>
+        <strong>Tempo (BPM):</strong>
+        <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="vertical-align: middle;">
+        <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 50px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">        
+    </div>
+
+    <br>
+    <div id="notation-container">
+        <div id="my-vextab" class="vextab-auto" 
+             width="800" scale="1.0" 
+             editor="true" editor-width="800" editor-height="150">
+            tabstave notation=true tablature=true time=4/4
+            notes :q 0/1 | :q 0/1 | :q 0/1 | :q 0/1 =|=
+        </div>
+    </div>
+
+
+    <br>
+    <br>
+    <div id="instruction-box">
+    <h3>Notation</h3>
+    <ul>
+        <li><strong>Notes:</strong> Denoted as &lt;fret number&gt;/&lt;string number&gt;. Notes on the same string can be grouped, e.g. 1-2-3/6.</li>
+        <li><strong>Duration:</strong> Note durations are indicated with ":" and a letter, and apply to all the following notes until the next duration marker. 
+        The currently available durations are: w h q 8 16 32, for whole, half, quarter, eighth, sixteenth, and thirty-second note durations.
+        For example, :q indicates a quarter note duration. Add d (e.g. :8d, :qd) for dotted rhythms.</li>
+        <li><strong>Rests:</strong> Indicated by ##. Prefix with a duration marker to indicate rest duration, e.g. :8 ##.</li>
+        <li><strong>Bar lines:</strong> | indicates a bar line. Use =|= for the ending double bar lines.</li>
+        <li><strong>Ties:</strong> Two same notes can be tied with T, e.g. 2T2/5</li>
+        <li><strong>Other:</strong> Bends (b, e.g. 7b9), hammer-ons (h, e.g. 5h6), pull-offs (p, e.g. 7p5), taps (t, e.g. t12), slides (s, e.g. 7s0)</li>
+    </ul>
+    <br>
+    See the <a href="https://www.vexflow.com/vextab/tutorial.html">Vextab Tutorial</a> for full details.        
+    <br>
+    <br>
+    <br>
+    <h3>Other comments</h3>
+    For simplicity, this generator draws notes from the A minor pentatonic and C major scales, so accidentals are avoided. Feel free to add them by adjusting the fret numbers using the editor.
+    <br>
+    <br>
+    The time signature can cause bar lines to be misaligned, so there is an option to show/hide it.
+    </div>
+    
+    <script>
+        
+        let ShowTimeSignature = true;
+
+        function toggleTimeSignature() {
+            console.log("timesign")
+            ShowTimeSignature = !ShowTimeSignature;
+            
+            const vexDiv = document.getElementById('my-vextab');
+            const editorDiv = vexDiv.querySelector('.editor');
+            let text = editorDiv.value;
+            const target = "time=4/4";
+
+            if (text.includes(target)) {
+                text = text.replace(" " + target, ""); // Try removing with leading space
+                text = text.replace(target, "");       // Fallback for no space
+            } else {
+                // 2. ADD: It doesn't exist, so we insert it.
+                text = text.replace("tabstave", "tabstave " + target);
+            }
+
+            editorDiv.value = text;
+            
+            if (editorDiv) {
+                // Create and dispatch keyup event, which triggers vextab to update the score from the editor
+                const event = new Event('keyup', { bubbles: true }); // bubbles: true allows the event to move up the DOM tree
+                editorDiv.dispatchEvent(event);
+            }
+        }
+        
+        // Mapping strings/frets to VexFlow keys (Standard Tuning)
+        const stringMap = [
+            null, // index 0
+            // String 1 (High E)
+            ["e/4", "f/4", "f#/4", "g/4", "g#/4", "a/4", "a#/4", "b/4", "c/5", "c#/5", "d/5", "d#/5", "e/5", "f/5", "f#/5", "g/5", "g#/5", "a/5", "a#/5", "b/5", "c/6", "c#/6", "d/6", "d#/6", "e/6"], 
+            // String 2 (B)
+            ["b/3", "c/4", "c#/4", "d/4", "d#/4", "e/4", "f/4", "f#/4", "g/4", "g#/4", "a/4", "a#/4", "b/4", "c/5", "c#/5", "d/5", "d#/5", "e/5", "f/5", "f#/5", "g/5", "g#/5", "a/5", "a#/5", "b/5"], 
+            // String 3 (G)
+            ["g/3", "g#/3", "a/3", "a#/3", "b/3", "c/4", "c#/4", "d/4", "d#/4", "e/4", "f/4", "f#/4", "g/4", "g#/4", "a/4", "a#/4", "b/4", "c/5", "c#/5", "d/5", "d#/5", "e/5", "f/5", "f#/5", "g/5"], 
+            // String 4 (D)
+            ["d/3", "d#/3", "e/3", "f/3", "f#/3", "g/3", "g#/3", "a/3", "a#/3", "b/3", "c/4", "c#/4", "d/4", "d#/4", "e/4", "f/4", "f#/4", "g/4", "g#/4", "a/4", "a#/4", "b/4", "c/5", "c#/5", "d/5"], 
+            // String 5 (A)
+            ["a/2", "a#/2", "b/2", "c/3", "c#/3", "d/3", "d#/3", "e/3", "f/3", "f#/3", "g/3", "g#/3", "a/3", "a#/3", "b/3", "c/4", "c#/4", "d/4", "d#/4", "e/4", "f/4", "f#/4", "g/4", "g#/4", "a/4"], 
+            // String 6 (Low E)
+            ["e/2", "f/2", "f#/2", "g/2", "g#/2", "a/2", "a#/2", "b/2", "c/3", "c#/3", "d/3", "d#/3", "e/3", "f/3", "f#/3", "g/3", "g#/3", "a/3", "a#/3", "b/3", "c/4", "c#/4", "d/4", "d#/4", "e/4"]
+        ];
+
+        const scales = {
+            // a_min_pentatonic (indices 0-6)
+            0: ["3/6", "5/6", "3/5", "5/5", "2/4", "5/4", "2/3", "5/3", "3/2", "5/2", "3/1", "5/1"],
+            1: ["5/6", "8/6", "5/5", "7/5", "5/4", "7/4", "5/3", "7/3", "5/2", "8/2", "5/1", "8/1"],
+            2: ["8/6", "10/6", "7/5", "10/5", "7/4", "10/4", "7/3", "9/3", "8/2", "10/2", "8/1", "10/1"],
+            3: ["10/6", "12/6", "10/5", "12/5", "10/4", "12/4", "9/3", "12/3", "10/2", "13/2", "10/1", "12/1"],
+            4: ["12/6", "15/6", "12/5", "15/5", "12/4", "14/4", "12/3", "14/3", "13/2", "15/2", "12/1", "15/1"],
+            5: ["15/6", "17/6", "15/5", "17/5", "14/4", "17/4", "14/3", "17/3", "15/2", "17/2", "15/1", "17/1"],
+            6: ["17/6", "20/6", "17/5", "19/5", "17/4", "19/4", "17/3", "19/3", "17/2", "20/2", "17/1", "20/1"],
+            // c_major (indices 7-12)
+            7: ["0/6", "1/6", "3/6", "0/5", "2/5", "3/5", "0/4", "2/4", "3/4", "0/3", "2/3", "0/2", "1/2", "3/2", "0/1", "1/1", "3/1"],
+            8: ["3/6", "5/6", "2/5", "3/5", "5/5", "2/4", "3/4", "5/4", "2/3", "4/3", "5/3", "3/2", "5/2", "6/2", "3/1", "5/1"],
+            9: ["5/6", "7/6", "8/6", "5/5", "7/5", "8/5", "5/4", "7/4", "4/3", "5/3", "7/3", "5/2", "6/2", "8/2", "5/1", "7/1", "8/1"],
+            10: ["8/6", "10/6", "7/5", "8/5", "10/5", "7/4", "9/4", "10/4", "7/3", "9/3", "10/2", "8/2", "10/2", "7/1", "8/1", "10/1"],
+            11: ["10/6", "12/6", "13/6", "10/5", "12/5", "9/4", "10/4", "12/4", "9/3", "10/3", "12/3", "10/2", "12/2", "13/2", "10/1", "12/1", "13/1"],
+            12: ["12/6", "13/6", "15/6", "12/5", "14/5", "15/5", "12/4", "14/4", "15/4", "12/3", "14/3", "12/2", "13/2", "15/2", "12/1", "13/1", "15/1"]
+        };
+                
+        function getRandomNote(min, max, strings) {
+            let str, fret, noteName;
+            let isSharp = true;
+            let attempts = 0;
+
+            // Keep picking a random note until we find one that isn't a sharp
+            // We add an 'attempts' limit to prevent an infinite loop if a range has NO natural notes
+            while (isSharp && attempts < 100) {
+                str = strings[Math.floor(Math.random() * strings.length)];
+                fret = Math.floor(Math.random() * (max - min + 1)) + min;
+                
+                // Get the note name from the map (e.g., "f#/4")
+                noteName = stringMap[str][fret];
+                
+                // Check if the note contains a '#'
+                if (noteName && !noteName.includes('#')) {
+                    isSharp = false;
+                }
+                attempts++;
+            }
+
+            return `${fret}/${str}`;
+        }
+        
+        function getNextNote(prevNote, min, max, strings) {
+            // 1. Find all arrays within the scales object that contain the prevNote
+            // Object.values(scales) converts the object into an array of its arrays
+            let possibleScales = Object.values(scales).filter(scaleArray => 
+                scaleArray.includes(prevNote)
+            );
+
+            // Fallback if note isn't in any scale
+            if (possibleScales.length === 0) {
+                return getRandomNote(min, max, strings);
+            }
+
+            // Pick one scale randomly from the matches
+            const activeScale = possibleScales[Math.floor(Math.random() * possibleScales.length)];
+            const currentIndex = activeScale.indexOf(prevNote);
+
+            // 2. Create candidate list (within 2 steps)
+            let candidates = [];
+            const steps = [-2, -2, -1, -1, -1, -1, 0, 1, 1, 1, 1, 2, 2]; // slightly favour notes one step away vs two steps away
+            
+            steps.forEach(step => {
+                let targetIdx = currentIndex + step;
+                if (targetIdx >= 0 && targetIdx < activeScale.length) {
+                    candidates.push(activeScale[targetIdx]);
+                }
+            });
+            
+            // 3. Selection and Validation
+            let attempts = 0;
+            while (attempts < 20) {
+                let candidate = candidates[Math.floor(Math.random() * candidates.length)];
+                
+                // Safety check if candidates is empty
+                if (!candidate) break;
+
+                let [fret, str] = candidate.split('/').map(Number);
+
+                // Check against min/max fret and string restriction
+                if (fret >= min && fret <= max && strings.includes(str)) {
+                    return candidate;
+                }
+                attempts++;
+            }
+
+            // Default to getRandomNote if validation fails
+            return getRandomNote(min, max, strings);
+        }
+        
+        function checkCadence(note1, note2) {
+            const chordsC = {
+                // C major
+                'i':   ['c', 'e', 'g'],
+                'ii':  ['d', 'f', 'a'],
+                'iii': ['e', 'g', 'b'],
+                'iv':  ['f', 'a', 'c'],
+                'v':   ['g', 'b', 'd'],
+                'vi':  ['a', 'c', 'e'],
+                'vii': ['b', 'd', 'f']
+            }
+                // A natural minor
+            const chordsA = {
+                'i':   ['a', 'c', 'e'],
+                'ii':  ['b', 'd', 'f'],
+                'iii': ['c', 'e', 'g'],
+                'iv':  ['d', 'f', 'a'],
+                'v':   ['e', 'g', 'b'],
+                'vi':  ['f', 'a', 'c'],
+                'vii': ['g', 'b', 'd']
+            };
+
+            const validCadences = [
+                ['v', 'i'],   // Perfect
+                ['iv', 'i'],  // Plagal
+                //['ii', 'v'],  // Imperfect
+                //['i', 'v'],   // Imperfect
+                //['iv', 'v'],  // Imperfect
+                //['vi', 'v']   // Imperfect
+            ];
+            
+            // Ensure incoming note names are converted to lowercase for comparison
+            const n1 = note1.toLowerCase();
+            const n2 = note2.toLowerCase();
+
+            return validCadences.some(([chordName1, chordName2]) => {
+                const chord1NotesC = chordsC[chordName1];
+                const chord2NotesC = chordsC[chordName2];
+                
+                const chord1NotesA = chordsA[chordName1];
+                const chord2NotesA = chordsA[chordName2];
+
+                // Check if n1 is in the first chord and n2 is in the second
+                return (chord1NotesC.includes(n1) && chord2NotesC.includes(n2)) || (chord1NotesA.includes(n1) && chord2NotesA.includes(n2)) ;
+            });
+        }
+        
+        function getWeightedPattern() {
+            // Rhythm Pattern Library
+            // 1: Quarter, 2: Two Eighths, 3: Eighth Rest + Eighth Note, 4: Quarter Rest
+            const weights = {
+                "quarter": 50,      // 50% chance
+                "eighths": 30,      // 30% chance
+                "rest_eighth": 10,   // 10% chance
+                "quarter_rest": 10   // 10% chance
+            };
+
+            // 1. Filter the weights to only include patterns currently checked in the UI                
+            const allowedPatterns = Array.from(document.querySelectorAll('.rhythm-check:checked')).map(cb => cb.value);
+            const activeEntries = Object.entries(weights).filter(([pattern]) => allowedPatterns.includes(pattern));
+
+            // 2. If no patterns are selected, provide a fallback to avoid errors
+            if (activeEntries.length === 0) return "quarter";
+
+            // 3. Calculate total weight of ONLY the allowed patterns
+            const totalWeight = activeEntries.reduce((sum, [_, weight]) => sum + weight, 0);
+            
+            let random = Math.random() * totalWeight;
+            
+            // 4. Standard weighted selection logic
+            for (const [pattern, weight] of activeEntries) {
+                if (random < weight) return pattern;
+                random -= weight;
+            }
+        }
+            
+        function generate() {
+            const minFret = parseInt(document.getElementById("minFret").value);
+            const maxFret = parseInt(document.getElementById("maxFret").value);
+            const selectedStrings = Array.from(document.querySelectorAll('.string-opt:checked'))
+                                         .map(cb => parseInt(cb.value));
+
+            if (selectedStrings.length === 0) {
+                alert("Select at least one string!");
+                return;
+            }
+            
+            let fullNotation = "";
+            let lastNote = null; // Track the previous note for the chain
+
+            // Helper to get the next note in the sequence
+            const getSequenceNote = () => {
+                if (!lastNote) {
+                    // First note ever: use getRandomNote
+                    lastNote = getRandomNote(minFret, maxFret, selectedStrings);
+                } else {
+                    // Subsequent notes: use getNextNote based on the last one
+                    lastNote = getNextNote(lastNote, minFret, maxFret, selectedStrings);
+                }
+                return lastNote;
+            };
+            
+            for (let bar = 0; bar < 4; bar++) {
+                let barNotes = "";
+                for (let beat = 0; beat < 4; beat++) {
+                    if (bar === 3 && beat === 2) { // Generate cadence in the final two beats
+                        let prevNote = lastNote;
+                        let isCadence = false;
+                        let attempts = 0;
+                        let cadenceNote1, cadenceNote2;
+
+                        while (!isCadence && attempts < 50) {
+                            // Reset lastNote so we always try a new branch from the end of beat 2
+                            lastNote = prevNote; 
+                            
+                            cadenceNote1 = getSequenceNote();
+                            cadenceNote2 = getSequenceNote();
+                            
+                            let [fret1, str1] = cadenceNote1.split('/').map(Number);
+                            let [fret2, str2] = cadenceNote2.split('/').map(Number);
+                            
+                            // Ensure stringMap exists and contains these coordinates
+                            let noteName1 = stringMap[str1][fret1].split('/')[0];
+                            let noteName2 = stringMap[str2][fret2].split('/')[0];
+                            
+                            if (noteName1 && noteName2 && checkCadence(noteName1, noteName2)) {
+                                isCadence = true;
+                            }
+                            attempts++;
+                        }
+
+                        // If we failed to find a perfect cadence, the last attempt is used as fallback
+                        barNotes += ` :q ${cadenceNote1} :q ${cadenceNote2} `;
+                        
+                        // Skip the rest of the normal beat logic for this specific beat
+                        beat++; // advance one extra beat
+                        continue; 
+                    }
+                    else {
+                        const choice = getWeightedPattern();
+
+                        switch(choice) {
+                            case "quarter": // ♩
+                                barNotes += ` :q ${getSequenceNote()} `;
+                                break;
+
+                            case "eighths": // ♫
+                                // Generate two notes, updating lastNote each time
+                                barNotes += ` :8 ${getSequenceNote()} ${getSequenceNote()} `;
+                                break;
+
+                            case "rest_eighth": // 𝄾 ♪
+                                // A rest doesn't change lastNote, but the following note does
+                                barNotes += ` :8 ## ${getSequenceNote()} `;
+                                break;
+
+                            case "quarter_rest": // 𝄽
+                                barNotes += ` :q ## `;
+                                break;
+                        }
+                    }
+                }
+                fullNotation += barNotes + (bar < 3 ? " | " : " =|= ");
+            }
+            
+            const timeSignature = ShowTimeSignature ? "time=4/4" : "";
+            const finalCode = `options space=20\ntabstave notation=true tablature=true ${timeSignature}\nnotes ${fullNotation}`;
+            
+            // Accessing the VexTab instance attached to the div
+            const vexDiv = document.getElementById('my-vextab');
+            const editorDiv = vexDiv.querySelector('.editor');
+            editorDiv.value = finalCode;
+            if (editorDiv) {
+                // Create and dispatch keyup event, which triggers vextab to update the score from the editor
+                const event = new Event('keyup', { bubbles: true }); // bubbles: true allows the event to move up the DOM tree
+                editorDiv.dispatchEvent(event);
+            }
+        }
+        
+        // Sync slider and input box
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmInput = document.getElementById('bpm-input');
+
+        bpmSlider.oninput = (e) => bpmInput.value = e.target.value;
+        bpmInput.oninput = (e) => bpmSlider.value = e.target.value;
+
+        async function playExercise() {
+            await Tone.start();
+
+            // 1. Setup Synth
+            const cleanGuitar = new Tone.Synth({
+                volume: 15, // Tone.js volume is in decibels; 20 is too loud!
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.005, decay: 1.2, sustain: 0.1, release: 1.2 }
+            }).toDestination();
+
+            const click = new Tone.MetalSynth({ 
+                volume: -10, 
+                envelope: { attack: 0.001, decay: 0.1 } 
+            }).toDestination();
+
+            // 2. Timing Setup
+            const bpm = parseFloat(document.getElementById('bpm-input').value) || 80;
+            const beatDuration = 60 / bpm;
+            const eighthDuration = beatDuration / 2;
+            
+            const vexDiv = document.getElementById('my-vextab');
+            const editorDiv = vexDiv.querySelector('.editor');
+            const rawText = editorDiv.value.split("notes")[1];
+            
+
+            // 3. Parse VexTab string
+            // This regex looks for duration markers (:q, :8) and notes (fret/string or ##)
+            const tokens = rawText.match(/:[q8]|(\d+\/\d+)|##/g);
+            
+            let timePointer = Tone.now();
+            let currentDuration = beatDuration; // Default to quarter
+
+            // 4 Beat Count-in
+            for(let i=0; i<4; i++) {
+                click.triggerAttackRelease("C2", "32n", timePointer);
+                timePointer += beatDuration;
+            }
+
+            // 4. Play Sequence
+            tokens.forEach(token => {
+                if (token === ":q") {
+                    currentDuration = beatDuration;
+                } else if (token === ":8") {
+                    currentDuration = eighthDuration;
+                } else if (token === "##") {
+                    // It's a rest, just move the pointer
+                    timePointer += currentDuration;
+                } else if (token.includes("/")) {
+                    // It's a note (fret/string)
+                    const [fret, str] = token.split('/').map(Number);
+                    const noteName = stringMap[str][fret]; // e.g., "e/4"
+
+                    if (noteName) {
+                        // Tone.js understands "e/4" as "E4"
+                        const toneKey = noteName.replace('/', ''); 
+                        cleanGuitar.triggerAttackRelease(toneKey, "8n", timePointer);
+                        console.log(toneKey)
+                    }
+                    timePointer += currentDuration;
+                }
+            });
+        }
+        
+        // Delay initial run to ensure VexTab has initialized the Editor
+        setTimeout(generate, 1000);
+    </script>
+    
+    
+    
+</body>
+</html>

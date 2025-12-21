@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythmic Recall</title>
+    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* 1. Global Styles */
+        body { 
+            font-family: sans-serif; 
+            text-align: center; 
+            padding: 10px; 
+            background: #f4f4f9; 
+            margin: 0;
+        }
+
+        /* 2. Containers & Instruction Box */
+        #instruction-box {
+            background: #ffffff;
+            border-left: 5px solid #4A90E2;
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+            padding: 15px 25px;
+            text-align: left;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        #instruction-box h3 { margin-top: 0; color: #333; font-size: 18px; }
+        #instruction-box ul { margin: 0; padding-left: 20px; color: #555; line-height: 1.6; }
+        #instruction-box li { margin-bottom: 8px; }
+
+        #controls {
+            background: #eee;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px auto 20px auto;
+            display: inline-block;
+            max-width: 95%;
+        }
+
+        /* 3. Music Score Display */
+        .score-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        #score {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            display: inline-block;
+            transform-origin: top center; 
+            transition: transform 0.2s ease;
+        }
+
+        /* 4. Interactive Elements (Buttons/Inputs) */
+        button { 
+            padding: 15px 25px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            border: none; 
+            background: #4A90E2; 
+            color: white; 
+            margin: 8px; 
+            width: 80%; 
+            max-width: 200px; 
+        }
+
+        .checkbox-item {
+            margin: 5px; 
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        input[type="checkbox"] {
+            transform: scale(1.2); 
+            margin-right: 5px;
+        }
+
+        /* 5. Mobile Responsiveness */
+        @media (max-width: 600px) {
+            #score {
+                transform: scale(0.65); 
+                margin-bottom: -30px; 
+                margin-top: -10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Rhythmic Recall Test</h1>
+    
+    <div class="score-container">
+        <div id="score"></div>
+    </div>
+    <br>
+
+    <div id="controls">
+        <strong>Include Patterns:</strong><br><br>
+        <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="quarter" checked> ♩ (Quarter)</label>
+        <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="eighths" checked> ♫ (Eighths)</label>
+        <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="rest_eighth" checked> 𝄾 ♪ (8th Rest/Note)</label>
+        <label class="checkbox-item"><input type="checkbox" class="rhythm-check" value="quarter_rest" checked> 𝄽 (Quarter Rest)</label>
+    </div>
+    <br>
+    
+    <div id="bpm-controls" style="margin-bottom: 20px;">
+    <strong>Tempo (BPM):</strong>
+    <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="vertical-align: middle;">
+    <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 50px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+    </div>
+    <br>
+    
+    <button onclick="generateRhythm()">New Rhythm</button>
+    <button onclick="playRhythm()">Play Audio</button>
+    
+    <br>
+    <br>
+    <div id="instruction-box">
+    <h3>How to Play</h3>
+    <ul>
+        <li><strong>New Rhythm:</strong> Generate a rhythm from the selected patterns. </li>
+        <li><strong>Play Audio:</strong> Listen to the 2-bar rhythm (with a 4-beat count-in).</li>
+        <li><strong>Edit Beats:</strong> Click directly on the notes to swap that beat for a different pattern.</li>
+    </ul>
+    </div>
+    
+    <script>
+        let currentRhythmIndices = [0, 0, 0, 0, 0, 0, 0, 0]; 
+        // Stores the index of the element from the 'elements' array for each of the 8 beats
+    
+        const { Renderer, Stave, StaveNote, Beam, Formatter } = Vex.Flow;
+        
+        // Define 4 elements with a unique ID to match checkbox values
+        const elements = [
+            { id: 'quarter', notes: ['q'] },
+            { id: 'eighths', notes: ['8', '8'] },
+            { id: 'rest_eighth', notes: ['8r', '8'] },
+            { id: 'quarter_rest', notes: ['qr'] }
+        ];
+
+        let currentRhythm = [];
+
+        function generateRhythm() {
+            const activeIds = Array.from(document.querySelectorAll('.rhythm-check:checked')).map(cb => cb.value);
+            const availableElements = elements.filter(el => activeIds.includes(el.id));
+            if (availableElements.length === 0) return alert("Select an element!");
+
+            currentRhythmIndices = [];
+            for (let i = 0; i < 8; i++) {
+                const randomEl = availableElements[Math.floor(Math.random() * availableElements.length)];
+                // Store the actual index of this element in the master 'elements' array
+                currentRhythmIndices.push(elements.indexOf(randomEl));
+            }
+            drawScore();
+        }
+        
+        function drawScore() {
+            
+            const div = document.getElementById("score");
+            div.innerHTML = ""; 
+            
+            // Keep the internal "drawing" width consistent so notes aren't cramped
+            // We only shrink below 600 if the screen is exceptionally small
+            const internalWidth = 600; 
+            const displayHeight = 150;
+            
+            const leftMargin = 20;
+            const barWidth = 270; 
+            const staveHeight = 40;
+
+            const renderer = new Renderer(div, Renderer.Backends.SVG);
+            renderer.resize(internalWidth, displayHeight);
+            const context = renderer.getContext();
+
+            // 1. Create Staves with calculated barWidth
+            const stave1 = new Stave(leftMargin, staveHeight, barWidth).addClef("treble").addTimeSignature("4/4");
+            stave1.setContext(context).draw();
+
+            const stave2 = new Stave(leftMargin + barWidth, staveHeight, barWidth);
+            stave2.setContext(context).draw();
+
+            // Helper to process notes for a specific set of beat-indices
+            const getNotesForBeats = (indices) => {
+                let allNotes = [];
+                indices.forEach((elIdx) => {
+                    const el = elements[elIdx];
+                    const staveNotes = el.notes.map(d => new StaveNote({ 
+                        keys: ["b/4"], 
+                        duration: d, 
+                        stem_direction: 1, 
+                        type: d.includes('r') ? 'r' : 'n'
+                    }));
+                    allNotes.push(...staveNotes);
+                });
+                return allNotes;
+            };
+
+            const bar1Notes = getNotesForBeats(currentRhythmIndices.slice(0, 4));
+            const bar2Notes = getNotesForBeats(currentRhythmIndices.slice(4, 8));
+
+            // Format and Draw
+            
+            const beams1 = Beam.generateBeams(bar1Notes);
+            Formatter.FormatAndDraw(context, stave1, bar1Notes);
+            beams1.forEach(b => b.setContext(context).draw());
+
+            const beams2 = Beam.generateBeams(bar2Notes);
+            Formatter.FormatAndDraw(context, stave2, bar2Notes);
+            beams2.forEach(b => b.setContext(context).draw());
+            
+            
+            // Add an event listener to redraw the score if the user rotates their phone
+            window.addEventListener('resize', drawScore);
+            
+            // --- Inside drawScore() click handler ---
+            const svg = div.querySelector('svg');
+            svg.onclick = (e) => {
+                const rect = svg.getBoundingClientRect();
+                
+                // We calculate X relative to the visually rendered size
+                //const x = e.clientX - rect.left;
+                const x = (e.clientX - rect.left) * (svg.viewBox.baseVal.width / rect.width); 
+
+                // New constant for the space taken by Clef and Time Signature
+                const clefWidth = 70; 
+                
+                // Width available for notes in Bar 1 (total bar width minus clef space)
+                const bar1NoteAreaWidth = barWidth - clefWidth;
+
+                let beatClicked = -1;
+
+                // Check if click is in Bar 1 (after the clef)
+                if (x >= (leftMargin + clefWidth) && x < (leftMargin + barWidth)) {
+                    beatClicked = Math.floor((x - (leftMargin + clefWidth)) / (bar1NoteAreaWidth / 4));
+                } 
+                // Check if click is in Bar 2 (calculation remains the same)
+                else if (x >= (leftMargin + barWidth) && x < (leftMargin + barWidth * 2)) {
+                    beatClicked = 4 + Math.floor((x - (leftMargin + barWidth)) / (barWidth / 4));
+                }
+
+                if (beatClicked >= 0 && beatClicked < 8) {
+                    swapBeat(beatClicked);
+                }
+            };
+        }
+
+        function swapBeat(index) {
+            const activeIds = Array.from(document.querySelectorAll('.rhythm-check:checked')).map(cb => cb.value);
+            const availableElements = elements.filter(el => activeIds.includes(el.id));
+            
+            // Find current element index in the master list
+            let currentMasterIdx = currentRhythmIndices[index];
+            
+            // Find next available element from the checked list
+            let nextIdx = (elements.findIndex(el => el.id === elements[currentMasterIdx].id) + 1) % elements.length;
+            
+            // Skip unchecked elements until we find one that is allowed
+            while (!activeIds.includes(elements[nextIdx].id)) {
+                nextIdx = (nextIdx + 1) % elements.length;
+            }
+
+            currentRhythmIndices[index] = nextIdx;
+            drawScore();
+        }
+        
+        // Sync slider and input box
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmInput = document.getElementById('bpm-input');
+
+        bpmSlider.oninput = (e) => bpmInput.value = e.target.value;
+        bpmInput.oninput = (e) => bpmSlider.value = e.target.value;
+        
+        async function playRhythm() {
+            await Tone.start();
+
+            // 1. Get current BPM and calculate the duration of one beat (quarter note)
+            const bpm = parseFloat(document.getElementById('bpm-input').value);
+            const beatDuration = 60 / bpm; // Time for a 'q' note in seconds
+            const eighthDuration = beatDuration / 2; // Time for an '8' note
+            
+            const cleanGuitar = new Tone.Synth({
+                volume: 15,
+                oscillator: {
+                    type: "triangle"
+                },
+                envelope: {
+                    attack: 0.005, // Immediate "pluck"
+                    decay: 1.2,    // How long it rings
+                    sustain: 0.1,  // Quiet holding level
+                    release: 1.2   // Fade out after note ends
+                }
+            }).toDestination();
+            
+            const click = new Tone.MetalSynth({ 
+                volume: -10, 
+                envelope: { attack: 0.001, decay: 0.1 } 
+            }).toDestination();
+            
+            const now = Tone.now();
+            let timePointer = now;
+
+            // 4 Beat Count-in
+            for(let i=0; i<4; i++) {
+                click.triggerAttackRelease("C2", "32n", timePointer);
+                timePointer += beatDuration;
+            }
+
+            // Play Rhythm
+            currentRhythmIndices.forEach(elIdx => {
+                elements[elIdx].notes.forEach(duration => {
+                    const isRest = duration.includes('r');
+                    const durValue = duration.replace('r', '');
+                    if (!isRest) cleanGuitar.triggerAttackRelease("E2", "8n", timePointer);
+                    timePointer += (durValue === 'q' ? beatDuration : eighthDuration);
+                });
+            });
+        }
+
+        // Initial Load
+        generateRhythm();
+    </script>
+    
+    
+</body>
+</html>

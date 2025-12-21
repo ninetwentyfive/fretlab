@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fretlab: A Guitar Practice Tool Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 { color: #333; margin-bottom: 30px; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
+            max-width: 1000px; /* Limits width to keep tiles neat on desktop */
+        }
+
+        /* --- The Tile Style --- */
+        .tool-tile {
+            background: white;
+            border-radius: 15px;
+            width: 280px;
+            height: 180px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+            text-decoration: none; 
+            color: inherit; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            border: 2px solid transparent;
+            box-sizing: border-box; /* Ensures padding doesn't affect width */
+        }
+
+        /* --- Hover Effects --- */
+        .tool-tile:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border-color: #4A90E2;
+        }
+
+        .tool-tile h3 {
+            margin: 0 0 10px 0;
+            color: #4A90E2;
+            font-size: 22px;
+        }
+
+        .tool-tile p {
+            margin: 0;
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Fretlab: A Guitar Practice Tool Suite</h1>
+
+    <div class="container">
+        <a href="sightreading.html" class="tool-tile">
+            <div class="icon">🎸</div>
+            <h3>Sight Reading</h3>
+            <p>Test your sight reading skills with randomised 4-bar exercises.</p>
+        </a>
+
+        <a href="rhythmicrecall.html" class="tool-tile">
+            <div class="icon">🥁</div>
+            <h3>Rhythmic Recall</h3>
+            <p>Test your rhythmic recall with randomised 2-bar rhythmic patterns.</p>
+        </a>
+    </div>
+
+</body>
+</html>

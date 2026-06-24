@@ -115,10 +115,22 @@
     </div>
     <br>
     
-    <div id="bpm-controls" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-    <strong style="width: 120px; text-align: right;">Tempo (BPM):</strong>
-    <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="flex: 1;">
-    <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 55px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+    <div style="width: 90%; max-width: 480px; margin: 0 auto;">
+    <div id="bpm-controls" style="margin-bottom: 10px;">
+        <strong style="display: block; margin-bottom: 4px;">Tempo (BPM):</strong>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="flex: 1;">
+            <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 55px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
+    </div>
+    
+    <div id="volume-controls" style="margin-bottom: 20px;">
+        <strong style="display: block; margin-bottom: 4px;">Volume:</strong>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="volume-slider" min="0" max="100" value="65" step="1" style="flex: 1;">
+            <input type="number" id="volume-input" min="0" max="100" value="65" style="width: 55px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
+    </div>
     </div>
     <br>
     
@@ -284,12 +296,24 @@
 
         bpmSlider.oninput = (e) => bpmInput.value = e.target.value;
         bpmInput.oninput = (e) => bpmSlider.value = e.target.value;
+
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeInput = document.getElementById('volume-input');
+
+        volumeSlider.oninput = (e) => {
+            volumeInput.value = e.target.value;
+            if (masterGain) masterGain.gain.value = e.target.value / 100;
+        };
+        volumeInput.oninput = (e) => {
+            volumeSlider.value = e.target.value;
+            if (masterGain) masterGain.gain.value = e.target.value / 100;
+        };
         
         async function playRhythm() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.65;
+                masterGain.gain.value = parseFloat(volumeInput.value) / 100;
                 masterGain.connect(audioCtx.destination);
             }
             if (audioCtx.state === 'suspended') await audioCtx.resume();

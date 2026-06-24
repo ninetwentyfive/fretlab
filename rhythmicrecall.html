@@ -115,10 +115,10 @@
     </div>
     <br>
     
-    <div id="bpm-controls" style="margin-bottom: 20px;">
-    <strong>Tempo (BPM):</strong>
-    <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="vertical-align: middle;">
-    <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 50px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+    <div id="bpm-controls" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+    <strong style="width: 120px; text-align: right;">Tempo (BPM):</strong>
+    <input type="range" id="bpm-slider" min="40" max="200" value="90" step="1" style="flex: 1;">
+    <input type="number" id="bpm-input" min="40" max="200" value="90" style="width: 55px; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
     </div>
     <br>
     
@@ -151,6 +151,8 @@
         ];
 
         let currentRhythm = [];
+        let audioCtx = null;
+        let masterGain = null;
 
         function generateRhythm() {
             const activeIds = Array.from(document.querySelectorAll('.rhythm-check:checked')).map(cb => cb.value);
@@ -275,6 +277,7 @@
             drawScore();
         }
         
+
         // Sync slider and input box
         const bpmSlider = document.getElementById('bpm-slider');
         const bpmInput = document.getElementById('bpm-input');
@@ -283,46 +286,59 @@
         bpmInput.oninput = (e) => bpmSlider.value = e.target.value;
         
         async function playRhythm() {
-            await Tone.start();
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.65;
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-            // 1. Get current BPM and calculate the duration of one beat (quarter note)
             const bpm = parseFloat(document.getElementById('bpm-input').value);
-            const beatDuration = 60 / bpm; // Time for a 'q' note in seconds
-            const eighthDuration = beatDuration / 2; // Time for an '8' note
-            
-            const cleanGuitar = new Tone.Synth({
-                volume: 15,
-                oscillator: {
-                    type: "triangle"
-                },
-                envelope: {
-                    attack: 0.005, // Immediate "pluck"
-                    decay: 1.2,    // How long it rings
-                    sustain: 0.1,  // Quiet holding level
-                    release: 1.2   // Fade out after note ends
-                }
-            }).toDestination();
-            
-            const click = new Tone.MetalSynth({ 
-                volume: -10, 
-                envelope: { attack: 0.001, decay: 0.1 } 
-            }).toDestination();
-            
-            const now = Tone.now();
+            const beatDuration = 60 / bpm;
+            const eighthDuration = beatDuration / 2;
+
+            function playClick(t) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = 1000;
+                gain.gain.setValueAtTime(0.35, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+                osc.connect(gain);
+                gain.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.08);
+            }
+
+            function playNote(freq, t) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(1.2, t + 0.003);
+                gain.gain.exponentialRampToValueAtTime(0.3, t + 0.25);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+                osc.connect(gain);
+                gain.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.75);
+            }
+
+            const now = audioCtx.currentTime;
             let timePointer = now;
 
-            // 4 Beat Count-in
-            for(let i=0; i<4; i++) {
-                click.triggerAttackRelease("C2", "32n", timePointer);
+            for (let i = 0; i < 4; i++) {
+                playClick(timePointer);
                 timePointer += beatDuration;
             }
 
-            // Play Rhythm
             currentRhythmIndices.forEach(elIdx => {
                 elements[elIdx].notes.forEach(duration => {
                     const isRest = duration.includes('r');
                     const durValue = duration.replace('r', '');
-                    if (!isRest) cleanGuitar.triggerAttackRelease("E2", "8n", timePointer);
+                    if (!isRest) playNote(220, timePointer);
                     timePointer += (durValue === 'q' ? beatDuration : eighthDuration);
                 });
             });

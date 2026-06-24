@@ -14,24 +14,43 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            padding: 20px 0; /* Added padding so content doesn't hug screen edges on mobile */
+            box-sizing: border-box;
         }
 
-        h1 { color: #333; margin-bottom: 30px; }
+        h1 { color: #333; margin-bottom: 10px; text-align: center; }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 5px;
+            text-align: center;
+            padding: 0 20px;
+        }
 
         .container {
-            display: flex;
+            display: grid;
+            /* Default: 1 column for mobile */
+            grid-template-columns: 1fr; 
             gap: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
             padding: 20px;
-            max-width: 1000px; /* Limits width to keep tiles neat on desktop */
+            width: 100%;
+            max-width: 640px; /* Keeps the 2x2 grid looking tight and neat */
+            box-sizing: border-box;
         }
 
-        /* --- The Tile Style --- */
+        /* Responsive Breakpoint for Tablets/Desktops */
+        @media (min-width: 600px) {
+            .container {
+                /* Switches to a perfect 2x2 layout */
+                grid-template-columns: repeat(2, 1fr); 
+            }
+        }
+
         .tool-tile {
             background: white;
             border-radius: 15px;
-            width: 280px;
+            /* Removed hardcoded width so it dynamically fills the grid column */
+            width: 100%; 
             height: 180px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -45,7 +64,7 @@
             text-align: center;
             padding: 20px;
             border: 2px solid transparent;
-            box-sizing: border-box; /* Ensures padding doesn't affect width */
+            box-sizing: border-box;
         }
 
         /* --- Hover Effects --- */
@@ -77,18 +96,32 @@
 <body>
 
     <h1>Fretlab: A Guitar Practice Tool Suite</h1>
+    <p class="subtitle">This is a collection of practice tools made during my guitar learning journey.</p>
+    <p class="subtitle">Check out the code <a href="https://github.com/ninetwentyfive/fretlab">here</a>.</p>
 
     <div class="container">
         <a href="sightreading.html" class="tool-tile">
             <div class="icon">🎸</div>
             <h3>Sight Reading</h3>
-            <p>Test your sight reading skills with randomised 4-bar exercises.</p>
+            <p>Sight reading tests with randomised 4-bar exercises.</p>
         </a>
 
         <a href="rhythmicrecall.html" class="tool-tile">
             <div class="icon">🥁</div>
             <h3>Rhythmic Recall</h3>
-            <p>Test your rhythmic recall with randomised 2-bar rhythmic patterns.</p>
+            <p>Rhythmic recall tests with randomised 2-bar rhythmic patterns.</p>
+        </a>
+
+        <a href="scales.html" class="tool-tile">
+            <div class="icon">🎼</div>
+            <h3>Scales</h3>
+            <p>Practise simple scales in the keys of G, A, B.</p>
+        </a>
+
+        <a href="tab_editor.html" class="tool-tile">
+            <div class="icon">📝</div>
+            <h3>Tab Editor</h3>
+            <p>Simple tab editor.</p>
         </a>
     </div>
 

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickTab Editor - Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h2 { margin-top: 0; color: #333; }
+
+        .toolbar {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #6c757d; }
+        
+        #toggleBtn { background-color: #28a745; }
+        #toggleBtn.active { background-color: #dc3545; }
+
+        textarea {
+            width: 100%;
+            height: 450px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 16px;
+            line-height: 1.2;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            white-space: pre;
+            overflow-x: auto;
+            resize: vertical;
+        }
+        
+        textarea.free-edit { border-color: #dc3545; background-color: #fffafb; }
+
+        .mode-indicator {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #666;
+            padding: 10px;
+            border-left: 4px solid #ddd;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Guitar Tab Editor</h2>
+    
+    <div class="toolbar">
+        <button onclick="insertBarline()">Insert Barline (|)</button>
+        <button onclick="addNewLine()" class="secondary">Add New Section</button>
+        <button id="toggleBtn" onclick="toggleMode()">Switch to Free Edit Mode</button>
+    </div>
+
+    <div id="modeStatus" class="mode-indicator" style="background: #e2f3e5; color: #1e7e34;">
+        Mode: Grid Mode (Auto-Hyphens)
+    </div>
+
+    <textarea id="tabArea" spellcheck="false"></textarea>
+
+    <div class="instructions">
+        <p id="instructionText"><strong>Grid Mode:</strong> Typing replaces hyphens. Backspace/Delete replaces text with hyphens. Use this for writing music.</p>
+    </div>
+</div>
+
+<script>
+    const tabArea = document.getElementById('tabArea');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const modeStatus = document.getElementById('modeStatus');
+    const instructionText = document.getElementById('instructionText');
+    
+    const lineNames = ['e|', 'B|', 'G|', 'D|', 'A|', 'E|'];
+    let isFreeEditMode = false;
+
+    function generateInitialTab() {
+        return lineNames.map(name => name + "-".repeat(60)).join('\n');
+    }
+
+    tabArea.value = generateInitialTab();
+
+    function toggleMode() {
+        isFreeEditMode = !isFreeEditMode;
+        if (isFreeEditMode) {
+            toggleBtn.innerText = "Switch to Grid Mode";
+            toggleBtn.classList.add('active');
+            tabArea.classList.add('free-edit');
+            modeStatus.innerText = "Mode: Free Edit (Normal Typing)";
+            modeStatus.style.background = "#f8d7da";
+            modeStatus.style.color = "#721c24";
+            instructionText.innerHTML = "<strong>Free Edit Mode:</strong> Type normally to fix errors or delete barlines.";
+        } else {
+            toggleBtn.innerText = "Switch to Free Edit Mode";
+            toggleBtn.classList.remove('active');
+            tabArea.classList.remove('free-edit');
+            modeStatus.innerText = "Mode: Grid Mode (Auto-Hyphens)";
+            modeStatus.style.background = "#e2f3e5";
+            modeStatus.style.color = "#1e7e34";
+            instructionText.innerHTML = "<strong>Grid Mode:</strong> Typing replaces hyphens. Backspace adds hyphens. Use this for writing music.";
+        }
+    }
+
+    tabArea.addEventListener('keydown', function(e) {
+        if (isFreeEditMode) return;
+
+        const start = this.selectionStart;
+        const val = this.value;
+        const lines = val.split('\n');
+
+        let currentPos = 0;
+        let lineIdx = -1;
+        let colIdx = -1;
+        for (let i = 0; i < lines.length; i++) {
+            if (start >= currentPos && start <= currentPos + lines[i].length) {
+                lineIdx = i;
+                colIdx = start - currentPos;
+                break;
+            }
+            currentPos += lines[i].length + 1;
+        }
+
+        const blockStartLine = lineIdx - (lineIdx % 7);
+
+        // 1. Backspace and Delete Logic
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            if (colIdx > 2 && val[start - 1] !== '\n' && val[start - 1] !== '|') {
+                this.value = val.substring(0, start - 1) + '-' + val.substring(start);
+                this.selectionStart = this.selectionEnd = start - 1;
+            }
+        } 
+        else if (e.key === 'Delete') {
+            e.preventDefault();
+            // Ensure we aren't deleting the line names (e.g., e|) or barlines (|)
+            if (colIdx >= 2 && val[start] !== '\n' && val[start] !== '|') {
+                this.value = val.substring(0, start) + '-' + val.substring(start + 1);
+                this.selectionStart = this.selectionEnd = start; // Keep cursor stationary
+            }
+        }
+        // 2. Typing Logic (including Expand-at-Barline)
+        else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            const charAtCursor = val[start];
+
+            if (charAtCursor === '|') {
+                // All strings of the section extend by 1
+                for (let i = 0; i < 6; i++) {
+                    let targetIdx = blockStartLine + i;
+                    let toAdd = (targetIdx === lineIdx) ? e.key : "-";
+                    lines[targetIdx] = lines[targetIdx].substring(0, colIdx) + toAdd + lines[targetIdx].substring(colIdx);
+                }
+                this.value = lines.join('\n');
+                this.selectionStart = this.selectionEnd = start + 1;
+            } 
+            else if (charAtCursor === '-') {
+                // Simple overwrite
+                this.value = val.substring(0, start) + e.key + val.substring(start + 1);
+                this.selectionStart = this.selectionEnd = start + 1;
+            }
+        }
+    });
+
+    function insertBarline() {
+        const pos = tabArea.selectionStart;
+        const lines = tabArea.value.split('\n');
+        
+        let currentPos = 0;
+        let lineIdx = -1;
+        let colIdx = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+            if (pos >= currentPos && pos <= currentPos + lines[i].length) {
+                lineIdx = i;
+                colIdx = pos - currentPos;
+                break;
+            }
+            currentPos += lines[i].length + 1;
+        }
+
+        const blockStartLine = lineIdx - (lineIdx % 7);
+        
+        for (let i = 0; i < 6; i++) {
+            let targetIdx = blockStartLine + i;
+            if (lines[targetIdx]) {
+                let l = lines[targetIdx];
+                // In Grid Mode, overwrite the character. In Free Edit, insert it.
+                if (isFreeEditMode) {
+                    lines[targetIdx] = l.substring(0, colIdx) + "|" + l.substring(colIdx);
+                } else {
+                    lines[targetIdx] = l.substring(0, colIdx) + "|" + l.substring(colIdx + 1);
+                }
+            }
+        }
+
+        tabArea.value = lines.join('\n');
+        tabArea.selectionStart = tabArea.selectionEnd = isFreeEditMode ? pos + 1 : pos;
+    }
+
+    function addNewLine() {
+        tabArea.value = tabArea.value.trimEnd() + '\n\n' + generateInitialTab();
+    }
+</script>
+
+</body>
+</html>

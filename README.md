@@ -30,6 +30,27 @@ An ear-training tool that generates and plays random 2-bar rhythmic patterns on 
 * **Editable Output:** Directly modify the rhythm by clicking/tapping on the score.
 * **Mobile-Friendly:** Tried to make the CSS work smoothly on phones and tablets.
 
+### 3. Scales Practice
+A fretboard visualiser and practice session generator for core scales and arpeggios. 
+
+**Key Features:**
+* **Randomised sessions:** Generates a randomised practice session based on selected keys (G, A, B), scale types and directions.
+* **Scale Types:** Contains Major, Natural Minor, Major/Minor Pentatonic, Blues scales, as well as Major and Minor arpeggios.
+* **Directions:** Ascending, Descending, or Both.
+* **Fretboard:** Displays box shapes with highlighted root notes.
+* **Metronome:** Plays a beat with a tempo slider.
+
+
+### 4. Guitar Tab Editor
+A text editor for standard 6-string guitar tablature. Still a little buggy.
+
+**Key Features:**
+* **Smart Grid Mode:** Typing automatically overwrites placeholders (`-`), and pressing backspace/delete safely restores them, ensuring the strings remain aligned.
+* **Auto-Expanding Barlines:** Typing directly on a barline (`|`) pushes the entire section forward uniformly so your vertical score formatting never breaks.
+* **Section Insertion:** Add new empty sections.
+* **Free Edit Toggle:** Switch to a standard text input mode whenever you need to fix typos or adjust text manually.
+
+
 ---
 
 ## Built With

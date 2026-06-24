@@ -1,0 +1,338 @@
+<!DOCTYPE html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Scales Practice</title> 
+    <style> 
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; } 
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; } 
+        .settings, .practice-area { display: flex; flex-direction: column; gap: 15px; } 
+        .hidden { display: none; } 
+        label.section-label { font-weight: bold; display: block; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; } 
+         
+        /* Checkbox Styling */ 
+        .checkbox-group { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; } 
+        .checkbox-item { display: flex; align-items: center; font-size: 0.9rem; cursor: pointer; } 
+        .checkbox-item input { width: auto; margin-right: 10px; cursor: pointer; } 
+ 
+        input[type="number"] { padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; } 
+        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; transition: background 0.2s; } 
+        button:hover { background: #0056b3; } 
+        canvas { background: #fff; margin-top: 15px; border: 1px solid #ddd; border-radius: 4px; } 
+        .scale-info { font-size: 1.5rem; font-weight: bold; color: #333; margin: 10px 0; } 
+         
+        /* Persistent Tempo Control */ 
+        .global-controls { background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px; } 
+        .tempo-container { display: flex; align-items: center; gap: 10px; justify-content: center; } 
+        #bpm-slider { flex-grow: 1; cursor: pointer; } 
+        #bpm-input { width: 60px; text-align: center; } 
+    </style> 
+</head> 
+<body> 
+ 
+<div class="container"> 
+    <h1>Scales Practice</h1> 
+ 
+    <div class="global-controls"> 
+        <label class="section-label">Tempo (BPM)</label> 
+        <div class="tempo-container"> 
+            <input type="range" id="bpm-slider" min="40" max="220" value="90" step="1"> 
+            <input type="number" id="bpm-input" min="40" max="220" value="90"> 
+        </div> 
+    </div> 
+ 
+    <div id="setup-screen" class="settings"> 
+        <div> 
+            <label class="section-label">Scale Types</label> 
+            <div id="scale-types-group" class="checkbox-group"> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Major" checked> Major</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Natural Minor" checked> Natural Minor</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Major Pentatonic" checked> Major Pentatonic</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Minor Pentatonic" checked> Minor Pentatonic</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Blues" checked> Blues</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Major arpeggio" checked> Major arpeggio</label> 
+                <label class="checkbox-item"><input type="checkbox" name="scale-type" value="Minor arpeggio" checked> Minor arpeggio</label> 
+            </div> 
+        </div> 
+ 
+        <div> 
+            <label class="section-label">Directions</label> 
+            <div id="directions-group" class="checkbox-group"> 
+                <label class="checkbox-item"><input type="checkbox" name="direction" value="Both directions" checked> Both directions</label> 
+                <label class="checkbox-item"><input type="checkbox" name="direction" value="Ascending" > Ascending</label> 
+                <label class="checkbox-item"><input type="checkbox" name="direction" value="Descending" > Descending</label> 
+            </div> 
+        </div> 
+ 
+        <div> 
+            <label class="section-label">Tests per Scale Type</label> 
+            <input type="number" id="test-count" value="3" min="1" max="7"> 
+        </div> 
+ 
+        <button onclick="startPractice()">Start Session</button> 
+    </div> 
+ 
+    <div id="practice-screen" class="practice-area hidden"> 
+        <div id="progress">Remaining: 0</div> 
+        <div class="scale-info" id="current-scale">---</div> 
+        <div id="current-direction" style="font-style: italic; color: #666;"></div> 
+         
+        <canvas id="fretboard" width="300" height="150"></canvas> 
+ 
+        <button id="metronome-toggle" onclick="toggleMetronome()" style="background: #28a745; margin-top: 10px;">Start Metronome</button> 
+        <button id="next-btn" onclick="nextScale()">Next Scale</button> 
+        <button onclick="reset()" style="background: #6c757d;">End Session</button> 
+    </div> 
+</div> 
+ 
+<script> 
+ 
+    // --- Metronome Engine --- 
+    let audioCtx = null; 
+    let nextTickTime = 0; 
+    let timerID = null; 
+    let isPlaying = false; 
+    const lookahead = 25.0;  
+    const scheduleAheadTime = 0.1;   
+ 
+    const bpmSlider = document.getElementById('bpm-slider'); 
+    const bpmInput = document.getElementById('bpm-input'); 
+ 
+    // Sync slider and input 
+    bpmSlider.oninput = (e) => bpmInput.value = e.target.value; 
+    bpmInput.oninput = (e) => bpmSlider.value = e.target.value; 
+ 
+    function playClick(time) { 
+        if (!audioCtx) return; 
+        const osc = audioCtx.createOscillator(); 
+        const envelope = audioCtx.createGain(); 
+ 
+        osc.type = 'triangle'; 
+        osc.frequency.value = 1000;  
+         
+        envelope.gain.setValueAtTime(1.0, time); 
+        envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.08); 
+ 
+        osc.connect(envelope); 
+        envelope.connect(audioCtx.destination); 
+ 
+        osc.start(time); 
+        osc.stop(time + 0.1); 
+    } 
+ 
+    function scheduler() { 
+        while (nextTickTime < audioCtx.currentTime + scheduleAheadTime) { 
+            playClick(nextTickTime); 
+            const secondsPerBeat = 60.0 / parseInt(bpmInput.value); 
+            nextTickTime += secondsPerBeat; 
+        } 
+        timerID = setTimeout(scheduler, lookahead); 
+    } 
+ 
+    function startMetronome() { 
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+        if (audioCtx.state === 'suspended') audioCtx.resume(); 
+        isPlaying = true; 
+        nextTickTime = audioCtx.currentTime + 0.05; 
+        scheduler(); 
+    } 
+ 
+    function stopMetronome() { 
+        isPlaying = false; 
+        if (timerID) clearTimeout(timerID); 
+    } 
+ 
+    function toggleMetronome() { 
+        const btn = document.getElementById('metronome-toggle'); 
+        if (isPlaying) { 
+            stopMetronome(); 
+            btn.innerText = "Start Metronome"; 
+            btn.style.background = "#28a745";  
+        } else { 
+            startMetronome(); 
+            btn.innerText = "Stop Metronome"; 
+            btn.style.background = "#dc3545";  
+        } 
+    } 
+ 
+    // --- Core Logic --- 
+     
+    const keys = ['G', 'A', 'B']; 
+    let practiceDeck = []; 
+    let currentIdx = 0; 
+     
+    function startPractice() { 
+        const selectedTypes = Array.from(document.querySelectorAll('input[name="scale-type"]:checked')).map(cb => cb.value); 
+        const selectedDirections = Array.from(document.querySelectorAll('input[name="direction"]:checked')).map(cb => cb.value); 
+        const count = parseInt(document.getElementById('test-count').value); 
+ 
+        if (selectedTypes.length === 0 || selectedDirections.length === 0) return alert("Select at least one type and direction!"); 
+ 
+        practiceDeck = []; 
+        selectedTypes.forEach(type => { 
+            let shuffledKeys = [...keys].sort(() => 0.5 - Math.random()); 
+            let pickedKeys = shuffledKeys.slice(0, count); 
+            pickedKeys.forEach(key => { 
+                const randomDirection = selectedDirections[Math.floor(Math.random() * selectedDirections.length)]; 
+                practiceDeck.push({ key, type, direction: randomDirection }); 
+            }); 
+        }); 
+ 
+        practiceDeck.sort(() => 0.5 - Math.random()); 
+        currentIdx = 0; 
+         
+        document.getElementById('setup-screen').classList.add('hidden'); 
+        document.getElementById('practice-screen').classList.remove('hidden'); 
+         
+        // Metronome remains stopped globally until user triggers it manually
+        const btn = document.getElementById('metronome-toggle'); 
+        btn.innerText = "Start Metronome"; 
+        btn.style.background = "#28a745"; 
+ 
+        showScale(); 
+    } 
+ 
+    function showScale() { 
+        document.getElementById('progress').innerText = `Remaining: ${practiceDeck.length - currentIdx}`; 
+         
+        if (currentIdx >= practiceDeck.length) { 
+            document.getElementById('current-scale').innerText = "Session Complete!"; 
+            document.getElementById('current-direction').innerText = ""; 
+            document.getElementById('next-btn').classList.add('hidden'); 
+            document.getElementById('metronome-toggle').classList.add('hidden'); 
+            stopMetronome(); 
+            return; 
+        } 
+ 
+        const item = practiceDeck[currentIdx]; 
+        document.getElementById('current-scale').innerText = `${item.key} ${item.type}`; 
+        document.getElementById('current-direction').innerText = item.direction; 
+         
+        drawFretboard(item.type); 
+    } 
+ 
+    function nextScale() { 
+        currentIdx++; 
+        showScale(); 
+    } 
+ 
+    function reset() { 
+        stopMetronome(); 
+        location.reload(); 
+    } 
+ 
+    function drawFretboard(type) { 
+        const canvas = document.getElementById('fretboard'); 
+        const ctx = canvas.getContext('2d'); 
+        ctx.clearRect(0, 0, canvas.width, canvas.height); 
+ 
+        const offsetLeft = 50;  
+        const fretWidth = 50; 
+        const stringSpacing = 20; 
+ 
+        ctx.strokeStyle = "#444"; 
+        ctx.lineWidth = 2; 
+ 
+        // Strings 
+        for(let i=0; i<6; i++) { 
+            let y = 20 + (i * stringSpacing); 
+            ctx.beginPath(); 
+            ctx.moveTo(offsetLeft, y);  
+            ctx.lineTo(offsetLeft + (4 * fretWidth), y); 
+            ctx.stroke(); 
+        } 
+ 
+        // Frets 
+        for(let i=0; i<5; i++) { 
+            let x = offsetLeft + (i * fretWidth); 
+            ctx.beginPath(); 
+            ctx.moveTo(x, 20); ctx.lineTo(x, 120); 
+            ctx.lineWidth = (i === 0) ? 6 : 2; 
+            ctx.stroke(); 
+        } 
+         
+        const drawNote = (f, s, isFilled = false) => {   
+            const color = "blue"; 
+            const x = offsetLeft + (f * fretWidth) - (fretWidth / 2);   
+            const y = 20 + ((s - 1) * stringSpacing); 
+            const radius = 7;   
+ 
+            ctx.beginPath();  
+            ctx.arc(x, y, radius, 0, Math.PI * 2);   
+ 
+            if (isFilled) {   
+                ctx.fillStyle = color;   
+                ctx.fill();   
+            } else {   
+                ctx.fillStyle = "white";   
+                ctx.fill();   
+                ctx.strokeStyle = color;   
+                ctx.lineWidth = 2;   
+                ctx.stroke();   
+            }   
+        }; 
+ 
+        // Scale mapping (Box shapes with Root on Low E string) 
+        switch (type) { 
+            case "Major": 
+                drawNote(1, 1, false); drawNote(2, 1, true); 
+                drawNote(2, 2, false); drawNote(4, 2, false); 
+                drawNote(1, 3, false); drawNote(3, 3, false); drawNote(4, 3, false); 
+                drawNote(1, 4, false); drawNote(3, 4, false); drawNote(4, 4, true); 
+                drawNote(1, 5, false); drawNote(2, 5, false); drawNote(4, 5, false); 
+                drawNote(2, 6, true);  drawNote(4, 6, false); 
+                break; 
+            case "Natural Minor": 
+                drawNote(1, 1, true);  drawNote(3, 1, false); drawNote(4, 1, false); 
+                drawNote(1, 2, false); drawNote(2, 2, false); drawNote(4, 2, false); 
+                drawNote(0, 3, false); drawNote(1, 3, false); drawNote(3, 3, false); 
+                drawNote(1, 4, false); drawNote(3, 4, true); 
+                drawNote(1, 5, false); drawNote(3, 5, false); drawNote(4, 5, false); 
+                drawNote(1, 6, true);  drawNote(3, 6, false); drawNote(4, 6, false); 
+                break; 
+            case "Major Pentatonic": 
+                drawNote(2, 1, true);  drawNote(4, 1, false); 
+                drawNote(2, 2, false); drawNote(4, 2, false); 
+                drawNote(1, 3, false); drawNote(3, 3, false); 
+                drawNote(1, 4, false); drawNote(4, 4, true); 
+                drawNote(1, 5, false); drawNote(4, 5, false); 
+                drawNote(2, 6, true);  drawNote(4, 6, false); 
+                break; 
+            case "Minor Pentatonic": 
+                drawNote(1, 1, true);  drawNote(4, 1, false); 
+                drawNote(1, 2, false); drawNote(4, 2, false); 
+                drawNote(1, 3, false); drawNote(3, 3, false); 
+                drawNote(1, 4, false); drawNote(3, 4, true); 
+                drawNote(1, 5, false); drawNote(3, 5, false); 
+                drawNote(1, 6, true);  drawNote(4, 6, false); 
+                break; 
+            case "Blues": 
+                drawNote(1, 1, true);  drawNote(4, 1, false); 
+                drawNote(1, 2, false); drawNote(4, 2, false); 
+                drawNote(1, 3, false); drawNote(3, 3, false); drawNote(4, 3, false); 
+                drawNote(1, 4, false); drawNote(3, 4, true); 
+                drawNote(1, 5, false); drawNote(2, 5, false); drawNote(3, 5, false); 
+                drawNote(1, 6, true);  drawNote(4, 6, false); 
+                break; 
+            case "Major arpeggio": 
+                drawNote(2, 1, true); 
+                drawNote(2, 2, false); 
+                drawNote(3, 3, false); 
+                drawNote(4, 4, true); 
+                drawNote(1, 5, false); drawNote(4, 5, false); 
+                drawNote(2, 6, true); 
+                break; 
+            case "Minor arpeggio": 
+                drawNote(1, 1, true); 
+                drawNote(1, 2, false); 
+                drawNote(1, 3, false); 
+                drawNote(3, 4, true); 
+                drawNote(3, 5, false); 
+                drawNote(1, 6, true);  drawNote(4, 6, false); 
+                break; 
+        } 
+    } 
+</script> 
+</body> 
+</html>
